@@ -69,7 +69,7 @@ typedef struct {
   mtev_atomic32_t refcnt;
 } ssl_ctx_cache_node;
 
-static mtev_hash_table ssl_ctx_cache = MTEV_HASH_EMPTY;
+static mtev_hash_table *ssl_ctx_cache = NULL;
 static pthread_mutex_t ssl_ctx_cache_lock = PTHREAD_MUTEX_INITIALIZER;
 static int ssl_ctx_cache_expiry = 5;
 static int ssl_ctx_cache_finfo_expiry = 5;
@@ -571,7 +571,7 @@ static void
 ssl_ctx_cache_remove(const char *key) {
   mtevL(eventer_deb, "ssl_ctx_cache->remove(%s)\n", key);
   pthread_mutex_lock(&ssl_ctx_cache_lock);
-  mtev_hash_delete(&ssl_ctx_cache, key, strlen(key),
+  mtev_hash_delete(ssl_ctx_cache, key, strlen(key),
                    NULL, (void (*)(void *))ssl_ctx_cache_node_free);
   pthread_mutex_unlock(&ssl_ctx_cache_lock);
 }
@@ -582,7 +582,7 @@ ssl_ctx_cache_get(const char *key) {
   ssl_ctx_cache_node *node = NULL;
   mtev_atomic32_t newval;
   pthread_mutex_lock(&ssl_ctx_cache_lock);
-  if(mtev_hash_retrieve(&ssl_ctx_cache, key, strlen(key), &vnode)) {
+  if(mtev_hash_retrieve(ssl_ctx_cache, key, strlen(key), &vnode)) {
     node = vnode;
     newval = mtev_atomic_inc32(&node->refcnt);
   }
@@ -596,12 +596,12 @@ ssl_ctx_cache_set(ssl_ctx_cache_node *node) {
   void *vnode;
   mtev_atomic32_t newval;
   pthread_mutex_lock(&ssl_ctx_cache_lock);
-  if(mtev_hash_retrieve(&ssl_ctx_cache, node->key, strlen(node->key),
+  if(mtev_hash_retrieve(ssl_ctx_cache, node->key, strlen(node->key),
                         &vnode)) {
     node = vnode;
   }
   else {
-    mtev_hash_store(&ssl_ctx_cache, node->key, strlen(node->key), node);
+    mtev_hash_store(ssl_ctx_cache, node->key, strlen(node->key), node);
   }
   newval = mtev_atomic_inc32(&node->refcnt);
   pthread_mutex_unlock(&ssl_ctx_cache_lock);
@@ -1102,6 +1102,9 @@ void eventer_ssl_init() {
   eventer_t e;
   int i, numlocks;
   if(__lcks) return;
+
+  ssl_ctx_cache = mtev_hash_new();
+
   numlocks = CRYPTO_num_locks();
   __lcks = CRYPTO_malloc(numlocks * sizeof(*__lcks),__FILE__,__LINE__);
   for(i=0; i<numlocks; i++)

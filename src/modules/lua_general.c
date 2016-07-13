@@ -374,7 +374,7 @@ mtev_lua_general_init(mtev_dso_generic_t *self) {
     free(symbol);
   }
 
-  lmc->pending = calloc(1, sizeof(*lmc->pending));
+  lmc->pending = mtev_hash_new();
 
   if(conf->booted) return true;
   conf->booted = mtev_true;

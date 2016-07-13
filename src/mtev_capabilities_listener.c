@@ -65,7 +65,7 @@ typedef struct mtev_capsvc_closure {
   size_t towrite;
 } mtev_capsvc_closure_t;
 
-static mtev_hash_table features = MTEV_HASH_EMPTY;
+static mtev_hash_table *features = NULL;
 static int
   mtev_capabilities_rest(mtev_http_rest_closure_t *, int, char **);
 static void
@@ -75,6 +75,7 @@ static void
 
 void
 mtev_capabilities_listener_init() {
+  features = mtev_hash_new();
   eventer_name_callback("capabilities_transit/1.0", mtev_capabilities_handler);
   mtev_control_dispatch_delegate(mtev_control_dispatch,
                                  MTEV_CAPABILITIES_SERVICE,
@@ -87,7 +88,7 @@ void
 mtev_capabilities_add_feature(const char *feature, const char *version) {
   feature = strdup(feature);
   if(version) version = strdup(version);
-  if(!mtev_hash_store(&features, feature, strlen(feature), (void *)version))
+  if(!mtev_hash_store(features, feature, strlen(feature), (void *)version))
     mtevL(mtev_error, "Feature conflict! %s version %s\n",
           feature, version ? version : "unpecified");
 }
@@ -116,12 +117,12 @@ mtev_capabilities_rest(mtev_http_rest_closure_t *restc, int n, char **p) {
 
 void
 mtev_capabilities_features_ncprint(mtev_console_closure_t ncct) {
-  if(mtev_hash_size(&features)) {
+  if(mtev_hash_size(features)) {
     mtev_hash_iter iter2 = MTEV_HASH_ITER_ZERO;
     void *vfv;
     const char *f;
     int flen;
-    while(mtev_hash_next(&features, &iter2, &f, &flen, &vfv)) {
+    while(mtev_hash_next(features, &iter2, &f, &flen, &vfv)) {
       if(vfv) nc_printf(ncct, "feature:\t%s:%s\n", f, (const char *)vfv);
       else    nc_printf(ncct, "feature:\t%s\n", f);
     }
@@ -179,12 +180,12 @@ mtev_capabilities_tobuff_json(mtev_capsvc_closure_t *cl, eventer_func_t curr) {
 
     /* features */
     feat = json_object_new_object();
-    if(mtev_hash_size(&features)) {
+    if(mtev_hash_size(features)) {
       mtev_hash_iter iter2 = MTEV_HASH_ITER_ZERO;
       void *vfv;
       const char *f;
       int flen;
-      while(mtev_hash_next(&features, &iter2, &f, &flen, &vfv)) {
+      while(mtev_hash_next(features, &iter2, &f, &flen, &vfv)) {
         struct json_object *featnode;
         featnode = json_object_new_object();
         if(vfv) json_object_object_add(featnode, "version", json_object_new_string(vfv));
@@ -322,12 +323,12 @@ mtev_capabilities_tobuff(mtev_capsvc_closure_t *cl, eventer_func_t curr) {
     /* features */
     feat = xmlNewNode(NULL, (xmlChar *)"features");
     xmlAddChild(root, feat);
-    if(mtev_hash_size(&features)) {
+    if(mtev_hash_size(features)) {
       mtev_hash_iter iter2 = MTEV_HASH_ITER_ZERO;
       void *vfv;
       const char *f;
       int flen;
-      while(mtev_hash_next(&features, &iter2, &f, &flen, &vfv)) {
+      while(mtev_hash_next(features, &iter2, &f, &flen, &vfv)) {
         xmlNodePtr featnode;
         featnode = xmlNewNode(NULL, (xmlChar *)"feature");
         xmlSetProp(featnode, (xmlChar *)"name", (xmlChar *)f);

@@ -49,61 +49,35 @@ typedef enum mtev_hash_lock_mode {
 } mtev_hash_lock_mode_t;
 
 
-typedef struct mtev_hash_table {
-  union {
-    ck_hs_t hs;
-    /**
-     * This is evil.  In order to maintain ABI compat 
-     * we are sneaking lock info into a pointer
-     * in the leftover space for cache alignment
-     * 
-     * A ck_hs_t is ~48 bytes but since it has
-     * always been declared up to a cache line
-     * there is trailing space we can sneak a 
-     * pointer into
-     */
-    struct {
-      char pad[sizeof(ck_hs_t)];
-      void *locks;
-    } locks;
-  } u CK_CC_CACHELINE;
-} mtev_hash_table;
+typedef struct mtev_hash_table mtev_hash_table;
 
 typedef ck_hs_iterator_t mtev_hash_iter;
 
-/* mdb support relies on this being exposed */
-typedef struct ck_key {
-  u_int32_t len;
-  char label[1];
-} ck_key_t;
-
-typedef struct ck_hash_attr {
-  void *data;
-  void *key_ptr;
-  ck_key_t key;
-} ck_hash_attr_t;
-
-CK_CC_CONTAINER(ck_key_t, struct ck_hash_attr, key,
-                index_attribute_container)
-
-#define MTEV_HASH_EMPTY { {{ NULL, NULL, 0, 0, NULL, NULL}} }
 #define MTEV_HASH_ITER_ZERO CK_HS_ITERATOR_INITIALIZER
 
 /**
- * will default to LOCK_MODE_MUTEX
+ * will default to LOCK_MODE_NONE and pre-allocation space of 256 entries.
  */
-void mtev_hash_init(mtev_hash_table *h);
+mtev_hash_table *mtev_hash_new();
+
 /**
- * will default to LOCK_MODE_MUTEX
+ * will default to LOCK_MODE_NONE and pre-allocation space of size.
  */
-void mtev_hash_init_size(mtev_hash_table *h, int size);
+mtev_hash_table *mtev_hash_new_size(int size);
+
 /**
  * Choose the lock mode when initing the hash.
  * 
  * It's worth noting that the lock only affects the write side of the hash,
  * the read side remains completely lock free.
  */
-void mtev_hash_init_locks(mtev_hash_table *h, int size, mtev_hash_lock_mode_t lock_mode);
+mtev_hash_table *mtev_hash_new_locks(int size, mtev_hash_lock_mode_t lock_mode);
+
+/**
+ * you must first call mtev_hash_destroy with your key and value free funcs.  If you
+ * fail to do this, calling this will leak memory
+ */
+void mtev_hash_free(mtev_hash_table *t);
 
 /* NOTE! "k" and "data" MUST NOT be transient buffers, as the hash table
  * implementation does not duplicate them.  You provide a pair of

@@ -45,7 +45,7 @@ static pthread_mutex_t c_lock = PTHREAD_MUTEX_INITIALIZER;
 static uuid_t my_cluster_id;
 static struct timeval my_boot_time;
 static mtev_boolean have_clusters;
-static mtev_hash_table global_clusters;
+static mtev_hash_table *global_clusters = NULL;
 
 static const struct timeval boot_time_of_dead_node = { (1UL
     << (CHAR_BIT * sizeof(boot_time_of_dead_node.tv_sec) - 1)) - 1, (1UL
@@ -212,7 +212,7 @@ mtev_cluster_check_timeouts() {
   struct timeval now;
   gettimeofday (&now, NULL);
 
-  while(mtev_hash_next(&global_clusters, &iter, &key, &klen, &value)) {
+  while(mtev_hash_next(global_clusters, &iter, &key, &klen, &value)) {
     mtev_cluster_check_timeout(value, now);
   }
 }
@@ -550,7 +550,7 @@ int mtev_cluster_update_internal(mtev_conf_section_t cluster,
   new_cluster->nodes = nlist; nlist = NULL;
 
   pthread_mutex_lock(&c_lock);
-  if(mtev_hash_retrieve(&global_clusters,
+  if(mtev_hash_retrieve(global_clusters,
                         new_cluster->name, strlen(new_cluster->name),
                         &vcluster)) {
     old_cluster = vcluster;
@@ -570,7 +570,7 @@ int mtev_cluster_update_internal(mtev_conf_section_t cluster,
     }
     mtev_cluster_compile(new_cluster);
     mtev_cluster_announce(new_cluster);
-    mtev_hash_replace(&global_clusters,
+    mtev_hash_replace(global_clusters,
 	      new_cluster->name, strlen(new_cluster->name),
                       new_cluster, NULL, mtev_cluster_free);
   }
@@ -583,7 +583,7 @@ int mtev_cluster_update_internal(mtev_conf_section_t cluster,
     }
     mtev_cluster_compile(new_cluster);
     mtev_cluster_announce(new_cluster);
-    mtev_hash_store(&global_clusters,
+    mtev_hash_store(global_clusters,
                     new_cluster->name, strlen(new_cluster->name),
                     new_cluster);
     rv = 0;
@@ -608,7 +608,7 @@ mtev_cluster_update(mtev_conf_section_t cluster) {
 mtev_cluster_t *
 mtev_cluster_by_name(const char *name) {
   void *vc;
-  if(mtev_hash_retrieve(&global_clusters, name, strlen(name), &vc))
+  if(mtev_hash_retrieve(global_clusters, name, strlen(name), &vc))
     return (mtev_cluster_t *)vc;
   return NULL;
 }
@@ -760,7 +760,7 @@ rest_show_cluster(mtev_http_rest_closure_t *restc, int n, char **p) {
     void *vc;
     const char *key;
     int klen;
-    while(mtev_hash_next(&global_clusters, &iter, &key, &klen, &vc)) {
+    while(mtev_hash_next(global_clusters, &iter, &key, &klen, &vc)) {
       xmlAddChild(root, mtev_cluster_to_xmlnode((mtev_cluster_t *)vc));
     }
   }
@@ -824,7 +824,7 @@ mtev_cluster_init() {
   mtev_conf_section_t *clusters, parent;
 
   gettimeofday(&my_boot_time, NULL);
-  mtev_hash_init(&global_clusters);
+  global_clusters = mtev_hash_new();
 
   parent = mtev_conf_get_section(NULL, "//clusters");
   if(!parent) return;

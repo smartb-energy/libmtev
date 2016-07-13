@@ -32,6 +32,7 @@
 #include <ck_hs.h>
 #include "utils/mtev_skiplist.h"
 #include "utils/mtev_hash.h"
+#include "utils/mtev_hash-private.h"
 
 static int mtev_skiplist_walk_init(mdb_walk_state_t *s) {
   mtev_skiplist l;

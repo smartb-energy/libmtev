@@ -3488,6 +3488,7 @@ static void mtev_lua_init() {
   nldeb = mtev_log_stream_find("debug/lua");
   if(!nlerr) nlerr = mtev_stderr;
   if(!nldeb) nldeb = mtev_debug;
+  mtev_lua_states_init();
   mtev_lua_init_dns();
 }
 

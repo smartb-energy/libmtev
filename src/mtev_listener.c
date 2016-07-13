@@ -50,10 +50,11 @@
 
 static mtev_log_stream_t nlerr = NULL;
 static mtev_log_stream_t nldeb = NULL;
-static mtev_hash_table listener_commands = MTEV_HASH_EMPTY;
+static mtev_hash_table *listener_commands = NULL;
+
 mtev_hash_table *
 mtev_listener_commands() {
-  return &listener_commands;
+  return listener_commands;
 }
 
 void
@@ -400,7 +401,7 @@ mtev_listener(char *host, unsigned short port, int type,
   listener_closure = calloc(1, sizeof(*listener_closure));
   listener_closure->family = family;
   listener_closure->port = htons(port);
-  listener_closure->sslconfig = calloc(1, sizeof(mtev_hash_table));
+  listener_closure->sslconfig = mtev_hash_new();
   mtev_hash_merge_as_dict(listener_closure->sslconfig, sslconfig);
   listener_closure->dispatch_callback = handler;
 
@@ -537,7 +538,7 @@ socket_error:
 
   ac->cmd = ntohl(cmd);
   /* Lookup cmd and dispatch */
-  if(mtev_hash_retrieve(&listener_commands,
+  if(mtev_hash_retrieve(listener_commands,
                         (char *)&ac->dispatch, sizeof(ac->dispatch),
                         (void **)&vdelegation_table)) {
     void *vfunc;
@@ -570,13 +571,13 @@ mtev_control_dispatch_delegate(eventer_func_t listener_dispatch,
   eventer_func_t *handler_copy;
   void *vdelegation_table;
   mtev_hash_table *delegation_table;
-  if(!mtev_hash_retrieve(&listener_commands,
+  if(!mtev_hash_retrieve(listener_commands,
                          (char *)&listener_dispatch, sizeof(listener_dispatch),
                          &vdelegation_table)) {
-    delegation_table = calloc(1, sizeof(*delegation_table));
+    delegation_table = mtev_hash_new();
     handler_copy = malloc(sizeof(*handler_copy));
     *handler_copy = listener_dispatch;
-    mtev_hash_store(&listener_commands,
+    mtev_hash_store(listener_commands,
                     (char *)handler_copy, sizeof(*handler_copy),
                     delegation_table);
   }
@@ -622,6 +623,7 @@ mtev_convert_sockaddr_to_buff(char *buff, int blen, struct sockaddr *remote) {
 
 void
 mtev_listener_init(const char *toplevel) {
+  listener_commands = mtev_hash_new();
   nlerr = mtev_log_stream_find("error/listener");
   nldeb = mtev_log_stream_find("debug/listener");
   if(!nlerr) nlerr = mtev_error;

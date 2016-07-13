@@ -79,7 +79,7 @@ struct rule_container {
   struct rest_url_dispatcher *rules;
   struct rest_url_dispatcher *rules_endptr;
 };
-mtev_hash_table dispatch_points = MTEV_HASH_EMPTY;
+static mtev_hash_table *dispatch_points = NULL;
 
 struct mtev_rest_acl_rule {
   mtev_boolean allow;
@@ -97,7 +97,7 @@ struct mtev_rest_acl {
   struct mtev_rest_acl *next;
 };
 
-static mtev_hash_table mime_type_defaults = MTEV_HASH_EMPTY;
+static mtev_hash_table *mime_type_defaults = NULL;
 
 static struct mtev_rest_acl *global_rest_acls = NULL;
 
@@ -119,7 +119,7 @@ mtev_mtev_console_show(mtev_console_closure_t ncct, int argc, char **argv,
   const char *key;
   int keylen;
   void *vcont;
-  while(mtev_hash_next(&dispatch_points, &iter, &key, &keylen, &vcont)) {
+  while(mtev_hash_next(dispatch_points, &iter, &key, &keylen, &vcont)) {
     struct rule_container *cont = vcont;
     struct rest_url_dispatcher *rule;
     for(rule = cont->rules; rule; rule = rule->next) {
@@ -153,7 +153,7 @@ mtev_http_rest_endpoints(mtev_http_rest_closure_t *restc,
   void *vcont;
   struct json_object *doc;
   doc = json_object_new_object();
-  while(mtev_hash_next(&dispatch_points, &iter, &key, &keylen, &vcont)) {
+  while(mtev_hash_next(dispatch_points, &iter, &key, &keylen, &vcont)) {
     struct rule_container *cont = vcont;
     struct rest_url_dispatcher *rule;
     struct json_object *arr, *jrule;
@@ -194,7 +194,7 @@ mtev_http_find_matching_route_rule(mtev_http_rest_closure_t *restc)
     void *vcont;
     while(eob >= uri_str && *eob != '/') eob--;
     if(eob < uri_str) break; /* off the front */
-    if(mtev_hash_retrieve(&dispatch_points, uri_str,
+    if(mtev_hash_retrieve(dispatch_points, uri_str,
                           eob - uri_str + 1, &vcont)) {
       cont = vcont;
       eob++; /* move past the determined base */
@@ -409,10 +409,10 @@ mtev_http_rest_register_auth_closure(const char *method, const char *base,
   rule->auth = auth;
 
   /* Make sure we have a container */
-  if(!mtev_hash_retrieve(&dispatch_points, base, strlen(base), &vcont)) {
+  if(!mtev_hash_retrieve(dispatch_points, base, strlen(base), &vcont)) {
     cont = calloc(1, sizeof(*cont));
     cont->base = strdup(base);
-    mtev_hash_store(&dispatch_points, cont->base, strlen(cont->base), cont);
+    mtev_hash_store(dispatch_points, cont->base, strlen(cont->base), cont);
   }
   else cont = vcont;
 
@@ -775,7 +775,7 @@ mtev_rest_simple_file_handler(mtev_http_rest_closure_t *restc,
     if(!mtev_hash_retr_str(restc->ac->config,
                            ext, strlen(ext),
                            &content_type)) {
-      if(!mtev_hash_retr_str(&mime_type_defaults, dot+1, strlen(dot+1),
+      if(!mtev_hash_retr_str(mime_type_defaults, dot+1, strlen(dot+1),
                              &content_type)) {
         content_type = "application/octet-stream";
       }
@@ -820,13 +820,11 @@ accrue_and_compile(const char *key, const char *value, void *vht) {
 static void
 compile_listener_res(mtev_conf_section_t node, mtev_hash_table **htptr) {
   int cnt;
-  mtev_hash_table *ht;
-  ht = calloc(1, sizeof(*ht));
-  mtev_hash_init(ht);
+  mtev_hash_table *ht = mtev_hash_new();
   cnt = mtev_conf_property_iter(node, accrue_and_compile, ht);
   if(cnt == 0) {
     mtev_hash_destroy(ht, free, pcre_free);
-    free(ht);
+    mtev_hash_free(ht);
     return;
   }
   *htptr = ht;
@@ -940,13 +938,16 @@ void mtev_http_rest_load_rules() {
   }
 }
 void mtev_http_rest_init() {
+  dispatch_points = mtev_hash_new();
+  mime_type_defaults = mtev_hash_new();
   mtev_http_init();
   eventer_name_callback("mtev_wire_rest_api/1.0", mtev_http_rest_handler);
   eventer_name_callback("http_rest_api", mtev_http_rest_raw_handler);
 
+
   /* some default mime types */
 #define ADD_MIME_TYPE(ext, type) \
-mtev_hash_store(&mime_type_defaults, strdup(ext), strlen(ext), strdup(type))
+mtev_hash_store(mime_type_defaults, strdup(ext), strlen(ext), strdup(type))
   ADD_MIME_TYPE("html", "text/html");
   ADD_MIME_TYPE("htm", "text/html");
   ADD_MIME_TYPE("js", "text/javascript");

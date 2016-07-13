@@ -114,7 +114,7 @@ typedef struct __mtev_console_closure {
   /* nice console support */
   EditLine *el;
   History *hist;
-  mtev_hash_table userdata;
+  mtev_hash_table *userdata;
   /* This is console completion magic */
   int mtev_edit_complete_cmdnum;
   int rl_point;

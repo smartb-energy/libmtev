@@ -47,9 +47,9 @@
 
 static mtev_log_stream_t nlerr = NULL;
 static mtev_log_stream_t nldeb = NULL;
-static mtev_hash_table mtev_lua_states = MTEV_HASH_EMPTY;
+static mtev_hash_table *mtev_lua_states = NULL;
 static pthread_mutex_t mtev_lua_states_lock = PTHREAD_MUTEX_INITIALIZER;
-static mtev_hash_table mtev_coros = MTEV_HASH_EMPTY;
+static mtev_hash_table *mtev_coros = NULL;
 static pthread_mutex_t coro_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void
@@ -60,7 +60,7 @@ mtev_lua_cancel_coro(mtev_lua_resume_info_t *ci) {
   lua_gc(ci->lmc->lua_state, LUA_GCCOLLECT, 0);
   mtevL(nldeb, "coro_store <- %p\n", ci->coro_state);
   pthread_mutex_lock(&coro_lock);
-  mtevAssert(mtev_hash_delete(&mtev_coros,
+  mtevAssert(mtev_hash_delete(mtev_coros,
                           (const char *)&ci->coro_state, sizeof(ci->coro_state),
                           NULL, NULL));
   pthread_mutex_unlock(&coro_lock);
@@ -72,7 +72,7 @@ mtev_lua_set_resume_info(lua_State *L, mtev_lua_resume_info_t *ri) {
   ri->lmc = lua_touserdata(L, lua_gettop(L));
   mtevL(nldeb, "coro_store -> %p\n", ri->coro_state);
   pthread_mutex_lock(&coro_lock);
-  mtev_hash_store(&mtev_coros,
+  mtev_hash_store(mtev_coros,
                   (const char *)&ri->coro_state, sizeof(ri->coro_state),
                   ri); 
   pthread_mutex_unlock(&coro_lock);
@@ -199,7 +199,7 @@ mtev_console_lua_thread_reporter_json(eventer_t e, int mask, void *closure,
   states = json_object_object_get(reporter->root, "states");
   memcpy(&iter, &zero, sizeof(zero));
   pthread_mutex_lock(&mtev_lua_states_lock);
-  while(mtev_hash_next(&mtev_lua_states, &iter, &key, &klen, &vri)) {
+  while(mtev_hash_next(mtev_lua_states, &iter, &key, &klen, &vri)) {
     struct json_object *state_info = NULL;
     char state_str[32];
     char thr_str[32];
@@ -222,7 +222,7 @@ mtev_console_lua_thread_reporter_json(eventer_t e, int mask, void *closure,
 
   memcpy(&iter, &zero, sizeof(zero));
   pthread_mutex_lock(&coro_lock);
-  while(mtev_hash_next(&mtev_coros, &iter, &key, &klen, &vri)) {
+  while(mtev_hash_next(mtev_coros, &iter, &key, &klen, &vri)) {
     mtev_lua_resume_info_t *ri;
     int level = 1;
     lua_Debug ar;
@@ -288,7 +288,7 @@ mtev_console_lua_thread_reporter_ncct(eventer_t e, int mask, void *closure,
 
   memcpy(&iter, &zero, sizeof(zero));
   pthread_mutex_lock(&mtev_lua_states_lock);
-  while(mtev_hash_next(&mtev_lua_states, &iter, &key, &klen, &vri)) {
+  while(mtev_hash_next(mtev_lua_states, &iter, &key, &klen, &vri)) {
     lua_State **Lptr = (lua_State **)key;
     pthread_t tgt = (pthread_t)(vpsized_int)vri;
     if(!pthread_equal(me, tgt)) continue;
@@ -300,7 +300,7 @@ mtev_console_lua_thread_reporter_ncct(eventer_t e, int mask, void *closure,
 
   memcpy(&iter, &zero, sizeof(zero));
   pthread_mutex_lock(&coro_lock);
-  while(mtev_hash_next(&mtev_coros, &iter, &key, &klen, &vri)) {
+  while(mtev_hash_next(mtev_coros, &iter, &key, &klen, &vri)) {
     mtev_lua_resume_info_t *ri;
     int level = 1;
     lua_Debug ar;
@@ -497,7 +497,7 @@ mtev_lua_new_coro(mtev_lua_resume_info_t *ri) {
   lua_pop(L, 1); /* pops mtev_coros */
   mtevL(nldeb, "coro_store -> %p\n", ri->coro_state);
   pthread_mutex_lock(&coro_lock);
-  mtev_hash_store(&mtev_coros,
+  mtev_hash_store(mtev_coros,
                   (const char *)&ri->coro_state, sizeof(ri->coro_state),
                   ri);
   pthread_mutex_unlock(&coro_lock);
@@ -509,7 +509,7 @@ mtev_lua_get_resume_info(lua_State *L) {
   lua_module_closure_t *lmc;
   void *v = NULL;
   pthread_mutex_lock(&coro_lock);
-  if(mtev_hash_retrieve(&mtev_coros, (const char *)&L, sizeof(L), &v)) {
+  if(mtev_hash_retrieve(mtev_coros, (const char *)&L, sizeof(L), &v)) {
     pthread_mutex_unlock(&coro_lock);
     ri = v;
     mtevAssert(pthread_equal(pthread_self(), ri->bound_thread));
@@ -526,7 +526,7 @@ mtev_lua_get_resume_info(lua_State *L) {
   lua_pushthread(L);
   ri->coro_state_ref = luaL_ref(L, -2);
   lua_pop(L, 1); /* pops mtev_coros */
-  mtev_hash_store(&mtev_coros,
+  mtev_hash_store(mtev_coros,
                   (const char *)&ri->coro_state, sizeof(ri->coro_state),
                   ri);
   pthread_mutex_unlock(&coro_lock);
@@ -560,8 +560,7 @@ mtev_lua_register_event(mtev_lua_resume_info_t *ci, eventer_t e) {
   eptr = calloc(1, sizeof(*eptr));
   memcpy(eptr, &e, sizeof(*eptr));
   if(!ci->events) {
-    ci->events = calloc(1, sizeof(*ci->events));
-    mtev_hash_init(ci->events);
+    ci->events = mtev_hash_new();
   }
   mtevAssert(mtev_hash_store(ci->events, (const char *)eptr, sizeof(*eptr), eptr));
 }
@@ -608,7 +607,7 @@ mtev_lua_table_to_hash(lua_State *L, int idx) {
   if(lua_gettop(L) < idx || !lua_istable(L,idx))
     luaL_error(L, "table_to_hash: not a table");
 
-  t = calloc(1, sizeof(*t));
+  t = mtev_hash_new();
   lua_pushnil(L);  /* first key */
   while (lua_next(L, idx) != 0) {
     const char *key, *value;
@@ -755,6 +754,13 @@ package_manip_path(char *in, const char *find, const char *replace) {
   return npath;
 }
 
+void
+mtev_lua_states_init()
+{
+  mtev_lua_states = mtev_hash_new();
+  mtev_coros = mtev_hash_new();
+}
+
 lua_State *
 mtev_lua_open(const char *module_name, void *lmc,
               const char *script_dir, const char *cpath) {
@@ -812,7 +818,7 @@ mtev_lua_open(const char *module_name, void *lmc,
   Lptr = malloc(sizeof(*Lptr));
   *Lptr = L;
   pthread_mutex_lock(&mtev_lua_states_lock);
-  mtev_hash_store(&mtev_lua_states,
+  mtev_hash_store(mtev_lua_states,
                   (const char *)Lptr, sizeof(*Lptr),
                   (void *)(vpsized_int)pthread_self());
   pthread_mutex_unlock(&mtev_lua_states_lock);

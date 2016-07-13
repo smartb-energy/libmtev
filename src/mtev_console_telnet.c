@@ -1815,6 +1815,7 @@ mtev_console_telnet_alloc(mtev_console_closure_t ncct) {
   tmp = ncct->telnet;
 
   ncct->telnet = calloc(1, sizeof(*telnet));
+  ncct->telnet->_env = mtev_hash_new();
   subbuffer = malloc(1024*64);
   subpointer = subbuffer;
   subend= subbuffer;
@@ -1852,7 +1853,8 @@ mtev_console_telnet_alloc(mtev_console_closure_t ncct) {
 void
 mtev_console_telnet_free(mtev_console_telnet_closure_t telnet) {
   free(telnet->_subbuffer);
-  mtev_hash_destroy(&telnet->_env, free, free);
+  mtev_hash_destroy(telnet->_env, free, free);
+  mtev_hash_free(telnet->_env);
   free(telnet);
 }
 
@@ -2978,7 +2980,7 @@ suboption(mtev_console_closure_t ncct)
 	    return;
 	settimer(xdisplocsubopt);
 	subpointer[SB_LEN()] = '\0';
-        mtev_hash_replace(&ncct->telnet->_env,
+        mtev_hash_replace(ncct->telnet->_env,
                           strdup("DISPLAY"), strlen("DISPLAY"),
                           strdup((char *)subpointer),
                           free, free);
@@ -3144,12 +3146,12 @@ suboption(mtev_console_closure_t ncct)
 	    case ENV_USERVAR:
 		*cp = '\0';
 		if (valp)
-                    mtev_hash_replace(&ncct->telnet->_env,
+                    mtev_hash_replace(ncct->telnet->_env,
                                       strdup(varp), strlen(varp),
                                       strdup(valp),
                                       free, free);
 		else
-                    mtev_hash_delete(&ncct->telnet->_env, varp, strlen(varp),
+                    mtev_hash_delete(ncct->telnet->_env, varp, strlen(varp),
                                      free, free);
 		cp = varp = (char *)subpointer;
 		valp = 0;
@@ -3167,12 +3169,12 @@ suboption(mtev_console_closure_t ncct)
 	}
 	*cp = '\0';
 	if (valp)
-            mtev_hash_replace(&ncct->telnet->_env,
+            mtev_hash_replace(ncct->telnet->_env,
                               strdup(varp), strlen(varp),
                               strdup(valp),
                               free, free);
 	else
-            mtev_hash_delete(&ncct->telnet->_env, varp, strlen(varp),
+            mtev_hash_delete(ncct->telnet->_env, varp, strlen(varp),
                              free, free);
 	break;
     }  /* end of case TELOPT_NEW_ENVIRON */

@@ -5,7 +5,7 @@ ifeq ($(V),)
 	Q=@
 endif
 
-LIBMTEV_VERSION=0.0.6
+LIBMTEV_VERSION=0.0.7
 
 prefix=@prefix@
 exec_prefix=@exec_prefix@
@@ -258,7 +258,7 @@ luamtev:        luamtev.o
 install-bins:	luamtev
 	$(top_srcdir)/buildtools/mkinstalldirs $(DESTDIR)$(bindir)
 	$(INSTALL) -m 0755 luamtev $(DESTDIR)$(bindir)/luamtev
-	
+
 install-libs:	mtevlibs
 	$(top_srcdir)/buildtools/mkinstalldirs $(DESTDIR)$(libdir)
 	$(INSTALL) -m 0755 $(LIBMTEV_V) $(DESTDIR)$(libdir)/$(LIBMTEV_V)

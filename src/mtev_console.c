@@ -212,6 +212,7 @@ mtev_console_closure_free(void *vncct) {
   if(ncct->outbuf) free(ncct->outbuf);
   if(ncct->telnet) mtev_console_telnet_free(ncct->telnet);
   mtev_hash_destroy(&ncct->userdata, NULL, mtev_console_userdata_free);
+  mtev_hash_free(&ncct->userdata);
   while(ncct->state_stack) {
     mtev_console_state_stack_t *tmp;
     tmp = ncct->state_stack;
@@ -231,7 +232,7 @@ mtev_console_closure_t
 mtev_console_closure_alloc() {
   mtev_console_closure_t new_ncct;
   new_ncct = calloc(1, sizeof(*new_ncct));
-  mtev_hash_init(&new_ncct->userdata);
+  new_ncct->userdata = mtev_hash_new();
   mtev_console_state_push_state(new_ncct, mtev_console_state_initial());
   new_ncct->pty_master = -1;
   new_ncct->pty_slave = -1;

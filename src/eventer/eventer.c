@@ -120,8 +120,9 @@ free_callback_details(void *vcd) {
   free(vcd);
 }
 
-static mtev_hash_table __name_to_func = MTEV_HASH_EMPTY;
-static mtev_hash_table __func_to_name = MTEV_HASH_EMPTY;
+static mtev_hash_table *__name_to_func = NULL;
+static mtev_hash_table *__func_to_name = NULL;
+
 int eventer_name_callback(const char *name, eventer_func_t f) {
   eventer_name_callback_ext(name, f, NULL, NULL);
   return 0;
@@ -132,20 +133,22 @@ int eventer_name_callback_ext(const char *name,
                               void *cl) {
   void **fptr = malloc(sizeof(*fptr));
   *fptr = (void *)f;
-  mtev_hash_replace(&__name_to_func, strdup(name), strlen(name),
+  if (__name_to_func == NULL) __name_to_func = mtev_hash_new();
+  mtev_hash_replace(__name_to_func, strdup(name), strlen(name),
                     (void *)f, free, NULL);
   struct callback_details *cd;
   cd = calloc(1, sizeof(*cd));
   cd->simple_name = strdup(name);
   cd->functional_name = fn;
   cd->closure = cl;
-  mtev_hash_replace(&__func_to_name, (char *)fptr, sizeof(*fptr), cd,
+  if (__func_to_name == NULL) __func_to_name = mtev_hash_new();
+  mtev_hash_replace(__func_to_name, (char *)fptr, sizeof(*fptr), cd,
                     free, free_callback_details);
   return 0;
 }
 eventer_func_t eventer_callback_for_name(const char *name) {
   void *vf;
-  if(mtev_hash_retrieve(&__name_to_func, name, strlen(name), &vf))
+  if(mtev_hash_retrieve(__name_to_func, name, strlen(name), &vf))
     return (eventer_func_t)vf;
   return (eventer_func_t)NULL;
 }
@@ -158,7 +161,7 @@ const char *eventer_name_for_callback(eventer_func_t f) {
 const char *eventer_name_for_callback_e(eventer_func_t f, eventer_t e) {
   void *vcd;
   struct callback_details *cd;
-  if(mtev_hash_retrieve(&__func_to_name, (char *)&f, sizeof(f), &vcd)) {
+  if(mtev_hash_retrieve(__func_to_name, (char *)&f, sizeof(f), &vcd)) {
     cd = vcd;
     if(cd->functional_name && e) {
       char *buf;

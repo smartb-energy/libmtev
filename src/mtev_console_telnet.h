@@ -149,7 +149,7 @@ struct clocks_t {
 };
 
 typedef struct _mtev_console_telnet_closure_t {
-  mtev_hash_table _env;
+  mtev_hash_table *_env;
   unsigned char *_subbuffer;
   unsigned char *_subpointer;
   unsigned char *_subend;

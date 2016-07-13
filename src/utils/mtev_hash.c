@@ -33,6 +33,7 @@
 
 #include "mtev_config.h"
 #include "mtev_hash.h"
+#include "mtev_hash-private.h"
 #include "mtev_log.h"
 #include <time.h>
 #include <stdio.h>
@@ -55,6 +56,8 @@
   b -= c; b -= a; b ^= (a<<10); \
   c -= a; c -= b; c ^= (b>>15); \
 }
+
+static void mtev_hash_init_locks(mtev_hash_table *h, int size, mtev_hash_lock_mode_t lock_mode);
 
 static inline
 u_int32_t __hash(const char *k, u_int32_t length, u_int32_t initval)
@@ -127,8 +130,15 @@ hs_compare(const void *previous, const void *compare)
 }
 
 static int rand_init;
-void mtev_hash_init(mtev_hash_table *h) {
-  return mtev_hash_init_size(h, NoitHASH_INITIAL_SIZE);
+
+mtev_hash_table *mtev_hash_new() {
+  mtev_hash_table *rval = calloc(1, sizeof(mtev_hash_table));
+  mtev_hash_init_locks(rval, NoitHASH_INITIAL_SIZE, MTEV_HASH_LOCK_MODE_MUTEX);
+  return rval;
+}
+
+void mtev_hash_free(mtev_hash_table *ht) {
+  free(ht);
 }
 
 static void *
@@ -269,11 +279,22 @@ mtev_hash_destroy_locks(mtev_hash_table *h)
 }
 
 
-void mtev_hash_init_size(mtev_hash_table *h, int size) {
-  mtev_hash_init_locks(h, size, MTEV_HASH_LOCK_MODE_NONE);
+mtev_hash_table *
+mtev_hash_new_size(int size) {
+  mtev_hash_table *rval = calloc(1, sizeof(mtev_hash_table));
+  mtev_hash_init_locks(rval, size, MTEV_HASH_LOCK_MODE_NONE);
+  return rval;
 }
 
-void mtev_hash_init_locks(mtev_hash_table *h, int size, mtev_hash_lock_mode_t lock_mode) {
+mtev_hash_table *
+mtev_hash_new_locks(int size, mtev_hash_lock_mode_t lock_mode) 
+{
+  mtev_hash_table *rval = calloc(1, sizeof(mtev_hash_table));
+  mtev_hash_init_locks(rval, size, lock_mode);
+  return rval;
+}
+
+static void mtev_hash_init_locks(mtev_hash_table *h, int size, mtev_hash_lock_mode_t lock_mode) {
   if(!rand_init) {
     srand48((long int)time(NULL));
     rand_init = 1;

@@ -50,7 +50,7 @@
 static mtev_atomic32_t threads_jobq_inited = 0;
 static pthread_key_t threads_jobq;
 static sigset_t alarm_mask;
-static mtev_hash_table all_queues = MTEV_HASH_EMPTY;
+static mtev_hash_table *all_queues = NULL;
 pthread_mutex_t all_queues_lock;
 
 static void
@@ -91,6 +91,8 @@ int
 eventer_jobq_init_ms(eventer_jobq_t *jobq, const char *queue_name,
                      eventer_jobq_memory_safety_t ms) {
   pthread_mutexattr_t mutexattr;
+
+  all_queues = mtev_hash_new();
 
   if(mtev_atomic_cas32(&threads_jobq_inited, 1, 0) == 0) {
     struct sigaction act;
@@ -146,7 +148,7 @@ eventer_jobq_init_ms(eventer_jobq_t *jobq, const char *queue_name,
     return -1;
   }
   pthread_mutex_lock(&all_queues_lock);
-  if(mtev_hash_store(&all_queues, jobq->queue_name, strlen(jobq->queue_name),
+  if(mtev_hash_store(all_queues, jobq->queue_name, strlen(jobq->queue_name),
                      jobq) == 0) {
     mtevL(mtev_error, "Duplicate queue name!\n");
     pthread_mutex_unlock(&all_queues_lock);
@@ -165,7 +167,7 @@ eventer_jobq_t *
 eventer_jobq_retrieve(const char *name) {
   void *vjq = NULL;
   pthread_mutex_lock(&all_queues_lock);
-  (void)mtev_hash_retrieve(&all_queues, name, strlen(name), &vjq);
+  (void)mtev_hash_retrieve(all_queues, name, strlen(name), &vjq);
   pthread_mutex_unlock(&all_queues_lock);
   return vjq;
 }
@@ -559,7 +561,7 @@ void eventer_jobq_process_each(void (*func)(eventer_jobq_t *, void *),
   mtev_hash_iter iter = MTEV_HASH_ITER_ZERO;
 
   pthread_mutex_lock(&all_queues_lock);
-  while(mtev_hash_next(&all_queues, &iter, &key, &klen, &vjobq)) {
+  while(mtev_hash_next(all_queues, &iter, &key, &klen, &vjobq)) {
     func((eventer_jobq_t *)vjobq, closure);
   }
   pthread_mutex_unlock(&all_queues_lock);

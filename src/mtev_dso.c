@@ -70,8 +70,8 @@ mtev_dso_loader_t __mtev_image_loader = {
   mtev_load_generic_image
 };
 
-static mtev_hash_table loaders = MTEV_HASH_EMPTY;
-static mtev_hash_table generics = MTEV_HASH_EMPTY;
+static mtev_hash_table *loaders = NULL;
+static mtev_hash_table *generics = NULL;
 static int mtev_dso_load_failure_count = 0;
 
 int mtev_dso_load_failures() {
@@ -80,7 +80,7 @@ int mtev_dso_load_failures() {
 mtev_dso_loader_t * mtev_loader_lookup(const char *name) {
   void *vloader;
 
-  if(mtev_hash_retrieve(&loaders, name, strlen(name), &vloader))
+  if(mtev_hash_retrieve(loaders, name, strlen(name), &vloader))
     return (mtev_dso_loader_t *)vloader;
   return NULL;
 }
@@ -107,18 +107,18 @@ mtev_dso_list(mtev_hash_table *t, const char ***f) {
 
 static int
 mtev_dso_list_loaders(const char ***f) {
-  return mtev_dso_list(&loaders, f);
+  return mtev_dso_list(loaders, f);
 }
 
 static int
 mtev_dso_list_generics(const char ***f) {
-  return mtev_dso_list(&generics, f);
+  return mtev_dso_list(generics, f);
 }
 
 mtev_dso_generic_t *mtev_dso_generic_lookup(const char *name) {
   void *vmodule;
 
-  if(mtev_hash_retrieve(&generics, name, strlen(name), &vmodule))
+  if(mtev_hash_retrieve(generics, name, strlen(name), &vmodule))
     return (mtev_dso_generic_t *)vmodule;
   return NULL;
 }
@@ -228,7 +228,7 @@ mtev_load_generic_image(mtev_dso_loader_t *loader,
     mtevL(mtev_stderr, "No image defined for %s\n", g_name);
     return NULL;
   }
-  if(mtev_load_image(g_file, g_name, &generics,
+  if(mtev_load_image(g_file, g_name, generics,
                      mtev_dso_generic_validate_magic,
                      sizeof(mtev_dso_generic_t))) {
     mtevL(mtev_stderr, "Could not load generic %s:%s\n", g_file, g_name);
@@ -248,7 +248,7 @@ mtev_load_loader_image(mtev_dso_loader_t *loader,
     mtevL(mtev_stderr, "No image defined for %s\n", loader_name);
     return NULL;
   }
-  if(mtev_load_image(loader_file, loader_name, &loaders,
+  if(mtev_load_image(loader_file, loader_name, loaders,
                      mtev_dso_loader_validate_magic,
                      sizeof(mtev_dso_loader_t))) {
     mtevL(mtev_stderr, "Could not load loader %s:%s\n", loader_file, loader_name);
@@ -261,6 +261,9 @@ mtev_load_loader_image(mtev_dso_loader_t *loader,
 void mtev_dso_init() {
   mtev_conf_section_t *sections;
   int i, cnt = 0;
+
+  loaders = mtev_hash_new();
+  generics = mtev_hash_new();
 
   mtev_dso_add_type("loader", mtev_dso_list_loaders);
   mtev_dso_add_type("generic", mtev_dso_list_generics);

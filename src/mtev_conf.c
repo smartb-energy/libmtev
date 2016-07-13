@@ -282,7 +282,7 @@ mtev_conf_watch_and_journal_watchdog(int (*f)(void *), void *c) {
   mtev_conf_watch_config_and_journal(NULL, EVENTER_TIMER, rj, &__now);
 }
 
-static mtev_hash_table _compiled_fallback = MTEV_HASH_EMPTY;
+static mtev_hash_table *_compiled_fallback = NULL;
 
 static struct {
   const char *key;
@@ -400,7 +400,7 @@ void
 mtev_conf_poke(const char *toplevel, const char *key, const char *val) {
   char keystr[256];
   snprintf(keystr, sizeof(keystr), key, toplevel);
-  mtev_hash_store(&_compiled_fallback,
+  mtev_hash_store(_compiled_fallback,
                   strdup(keystr), strlen(keystr),
                   (void *)strdup(val));
 }
@@ -408,6 +408,8 @@ mtev_conf_poke(const char *toplevel, const char *key, const char *val) {
 DECLARE_CHECKER(name)
 void mtev_conf_init(const char *toplevel) {
   int i;
+
+  _compiled_fallback = mtev_hash_new();
 
   xml_debug = mtev_log_stream_find("debug/xml");
 
@@ -1386,13 +1388,12 @@ mtev_conf_get_into_hash(mtev_conf_section_t section,
 mtev_hash_table *
 mtev_conf_get_namespaced_hash(mtev_conf_section_t section,
                               const char *path, const char *ns) {
-  mtev_hash_table *table = NULL;
+  mtev_hash_table *table = mtev_hash_new();
 
-  table = calloc(1, sizeof(*table));
   mtev_conf_get_into_hash(section, path, table, ns);
   if(mtev_hash_size(table) == 0) {
     mtev_hash_destroy(table, free, free);
-    free(table);
+    mtev_hash_free(table);
     table = NULL;
   }
   return table;
@@ -1400,9 +1401,8 @@ mtev_conf_get_namespaced_hash(mtev_conf_section_t section,
 
 mtev_hash_table *
 mtev_conf_get_hash(mtev_conf_section_t section, const char *path) {
-  mtev_hash_table *table = NULL;
+  mtev_hash_table *table = mtev_hash_new();
 
-  table = calloc(1, sizeof(*table));
   mtev_conf_get_into_hash(section, path, table, NULL);
   return table;
 }
@@ -1511,7 +1511,7 @@ _mtev_conf_get_string(mtev_conf_section_t section, xmlNodePtr *vnode,
     free(basepath);
     interest = fullpath;
   }
-  if(mtev_hash_retr_str(&_compiled_fallback,
+  if(mtev_hash_retr_str(_compiled_fallback,
                         interest, strlen(interest), &str)) {
     *value = (char *)xmlStrdup((xmlChar *)str);
     goto found;

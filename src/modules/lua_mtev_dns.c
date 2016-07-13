@@ -49,8 +49,8 @@
 #include "lua_mtev.h"
 #include <udns.h>
 
-static mtev_hash_table dns_rtypes = MTEV_HASH_EMPTY;
-static mtev_hash_table dns_ctypes = MTEV_HASH_EMPTY;
+static mtev_hash_table *dns_rtypes = NULL;
+static mtev_hash_table *dns_ctypes = NULL;
 static __thread mtev_hash_table *dns_ctx_store = NULL;
 
 typedef struct dns_ctx_handle {
@@ -139,7 +139,7 @@ static void dns_ctx_handle_free(void *vh) {
 static dns_ctx_handle_t *dns_ctx_alloc(const char *ns) {
   void *vh;
   dns_ctx_handle_t *h = NULL;
-  if(!dns_ctx_store) dns_ctx_store = calloc(1, sizeof(*dns_ctx_store));
+  if(!dns_ctx_store) dns_ctx_store = mtev_hash_new();
   if(ns == NULL && default_ctx_handle != NULL) {
     /* special case -- default context */
     h = default_ctx_handle;
@@ -192,7 +192,7 @@ static void dns_ctx_release(dns_ctx_handle_t *h) {
     mtev_atomic_dec32(&h->refcnt);
     return;
   }
-  if(!dns_ctx_store) dns_ctx_store = calloc(1, sizeof(*dns_ctx_store));
+  if(!dns_ctx_store) dns_ctx_store = mtev_hash_new();
   if(mtev_atomic_dec32(&h->refcnt) == 0) {
     /* I was the last one */
     mtevAssert(mtev_hash_delete(dns_ctx_store, h->ns, strlen(h->ns),
@@ -447,12 +447,12 @@ static int mtev_lua_dns_lookup(lua_State *L) {
   for(d = rtype_up, c = rtype; *c; d++, c++) *d = toupper(*c);
   *d = '\0';
 
-  if(!mtev_hash_retrieve(&dns_ctypes, ctype_up, strlen(ctype_up), &vnv_pair))
+  if(!mtev_hash_retrieve(dns_ctypes, ctype_up, strlen(ctype_up), &vnv_pair))
     dlc->error = strdup("bad class");
   else
     dlc->query_ctype = (enum dns_class)((struct dns_nameval *)vnv_pair)->val;
 
-  if(!mtev_hash_retrieve(&dns_rtypes, rtype_up, strlen(rtype_up), &vnv_pair)) 
+  if(!mtev_hash_retrieve(dns_rtypes, rtype_up, strlen(rtype_up), &vnv_pair)) 
     dlc->error = strdup("bad rr type");
   else
     dlc->query_rtype = (enum dns_type)((struct dns_nameval *)vnv_pair)->val;
@@ -524,14 +524,17 @@ void mtev_lua_init_dns() {
   const struct dns_nameval *nv;
   struct dns_ctx *pctx;
 
+  dns_rtypes = mtev_hash_new();
+  dns_ctypes = mtev_hash_new();
+
   /* HASH the rr types */
   for(i=0, nv = &dns_typetab[i]; nv->name; nv = &dns_typetab[++i])
-    mtev_hash_store(&dns_rtypes,
+    mtev_hash_store(dns_rtypes,
                     nv->name, strlen(nv->name),
                     (void *)nv);
   /* HASH the class types */
   for(i=0, nv = &dns_classtab[i]; nv->name; nv = &dns_classtab[++i])
-    mtev_hash_store(&dns_ctypes,
+    mtev_hash_store(dns_ctypes,
                     nv->name, strlen(nv->name),
                     (void *)nv);
 

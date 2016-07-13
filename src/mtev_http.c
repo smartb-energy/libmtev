@@ -100,11 +100,11 @@ struct mtev_http_request {
   char *method_str;
   char *uri_str;
   char *protocol_str;
-  mtev_hash_table querystring;
+  mtev_hash_table *querystring;
   u_int32_t opts;
   mtev_http_method method;
   mtev_http_protocol protocol;
-  mtev_hash_table headers;
+  mtev_hash_table *headers;
   mtev_boolean complete;
   struct timeval start_time;
   char *orig_qs;
@@ -115,7 +115,7 @@ struct mtev_http_response {
   int status_code;
   char *status_reason;
 
-  mtev_hash_table headers;
+  mtev_hash_table *headers;
   struct bchain *leader; /* serialization of status line and headers */
 
   u_int32_t output_options;

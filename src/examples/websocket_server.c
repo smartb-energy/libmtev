@@ -74,11 +74,11 @@ child_main() {
     exit(2);
   }
   eventer_init();
+  mtev_listener_init(APPNAME);
   mtev_console_init(APPNAME);
   mtev_http_rest_init();
   mtev_capabilities_listener_init();
   mtev_events_rest_init();
-  mtev_listener_init(APPNAME);
   mtev_dso_init();
   mtev_dso_post_init();
 

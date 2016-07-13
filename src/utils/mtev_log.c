@@ -362,8 +362,8 @@ mtev_log_memory_lines_since(mtev_log_stream_t ls, u_int64_t afterwhich,
 #define IS_DEBUG_BELOW(ls) ((ls)->flags_below & MTEV_LOG_STREAM_DEBUG)
 #define IS_FACILITY_BELOW(ls) ((ls)->flags_below & MTEV_LOG_STREAM_FACILITY)
 
-static mtev_hash_table mtev_loggers = MTEV_HASH_EMPTY;
-static mtev_hash_table mtev_logops = MTEV_HASH_EMPTY;
+static mtev_hash_table *mtev_loggers = NULL;
+static mtev_hash_table *mtev_logops = NULL;
 mtev_log_stream_t mtev_stderr = NULL;
 mtev_log_stream_t mtev_error = NULL;
 mtev_log_stream_t mtev_debug = NULL;
@@ -380,7 +380,7 @@ mtev_log_dematerialize() {
   int klen;
   void *data;
 
-  while(mtev_hash_next(&mtev_loggers, &iter, &k, &klen, &data)) {
+  while(mtev_hash_next(mtev_loggers, &iter, &k, &klen, &data)) {
     mtev_log_stream_t ls = data;
     ls->deps_materialized = 0;
     ls->flags &= ~MTEV_LOG_STREAM_RECALCULATE;
@@ -1177,8 +1177,8 @@ static logops_t jlog_logio_ops = {
 
 void
 mtev_log_init(int debug_on) {
-  mtev_hash_init(&mtev_loggers);
-  mtev_hash_init(&mtev_logops);
+  mtev_loggers = mtev_hash_new();
+  mtev_logops = mtev_hash_new();
   mtev_register_logops("file", &posix_logio_ops);
   mtev_register_logops("jlog", &jlog_logio_ops);
   mtev_register_logops("memory", &membuf_logio_ops);
@@ -1196,7 +1196,7 @@ mtev_log_init(int debug_on) {
 
 void
 mtev_register_logops(const char *name, logops_t *ops) {
-  mtev_hash_store(&mtev_logops, strdup(name), strlen(name), ops);
+  mtev_hash_store(mtev_logops, strdup(name), strlen(name), ops);
 }
 
 void *
@@ -1251,8 +1251,7 @@ mtev_log_stream_set_property(mtev_log_stream_t ls,
                              const char *prop, const char *v) {
   if(!ls) return;
   if(!ls->config) {
-    ls->config = calloc(1, sizeof(*ls->config));
-    mtev_hash_init(ls->config);
+    ls->config = mtev_hash_new();
   }
   mtev_hash_replace(ls->config, prop, strlen(prop), (void *)v, free, free);
 }
@@ -1289,7 +1288,7 @@ mtev_log_stream_new_on_fd(const char *name, int fd, mtev_hash_table *config) {
    * for an explanation.
    */
   lsname = strdup(ls->name);
-  if(mtev_hash_store(&mtev_loggers,
+  if(mtev_hash_store(mtev_loggers,
                      lsname, strlen(ls->name), ls) == 0) {
     free(lsname);
     free(ls->name);
@@ -1310,7 +1309,7 @@ mtev_log_resolve(mtev_log_stream_t ls) {
   void *vops = NULL;
   if(!ls->type) return mtev_true;
   if(ls->ops) return mtev_true;
-  if(mtev_hash_retrieve(&mtev_logops, ls->type, strlen(ls->type),
+  if(mtev_hash_retrieve(mtev_logops, ls->type, strlen(ls->type),
                         &vops)) {
     ls->ops = vops;
   }
@@ -1325,7 +1324,7 @@ mtev_log_final_resolve() {
   const char *key;
   int klen;
   void *vls;
-  while(mtev_hash_next(&mtev_loggers, &iter, &key, &klen, &vls)) {
+  while(mtev_hash_next(mtev_loggers, &iter, &key, &klen, &vls)) {
     if(!mtev_log_resolve((mtev_log_stream_t)vls)) {
       mtevL(mtev_stderr, "Failed to resolve log: %s\n", key);
       return mtev_false;
@@ -1349,7 +1348,7 @@ mtev_log_stream_new(const char *name, const char *type, const char *path,
   ls->config = config;
   if(!type)
     ls->ops = NULL;
-  else if(mtev_hash_retrieve(&mtev_logops, type, strlen(type),
+  else if(mtev_hash_retrieve(mtev_logops, type, strlen(type),
                              &vops))
     ls->ops = vops;
  
@@ -1375,7 +1374,7 @@ mtev_log_stream_new(const char *name, const char *type, const char *path,
      */
     char *lsname;
     lsname = strdup(ls->name);
-    if(mtev_hash_store(&mtev_loggers,
+    if(mtev_hash_store(mtev_loggers,
                        lsname, strlen(ls->name), ls) == 0) {
       free(lsname);
       goto freebail;
@@ -1400,7 +1399,7 @@ mtev_log_stream_new(const char *name, const char *type, const char *path,
 mtev_log_stream_t
 mtev_log_stream_find(const char *name) {
   void *vls;
-  if(mtev_hash_retrieve(&mtev_loggers, name, strlen(name), &vls)) {
+  if(mtev_hash_retrieve(mtev_loggers, name, strlen(name), &vls)) {
     return (mtev_log_stream_t)vls;
   }
   return NULL;
@@ -1408,7 +1407,7 @@ mtev_log_stream_find(const char *name) {
 
 void
 mtev_log_stream_remove(const char *name) {
-  mtev_hash_delete(&mtev_loggers, name, strlen(name), free, NULL);
+  mtev_hash_delete(mtev_loggers, name, strlen(name), free, NULL);
 }
 
 void
@@ -1715,7 +1714,7 @@ mtev_log_reopen_type(const char *type) {
   void *data;
   mtev_log_stream_t ls;
 
-  while(mtev_hash_next(&mtev_loggers, &iter, &k, &klen, &data)) {
+  while(mtev_hash_next(mtev_loggers, &iter, &k, &klen, &data)) {
     ls = data;
     if(ls->ops && ls->type && !strcmp(ls->type, type))
       if(ls->ops->reopenop(ls) < 0) rv = -1;
@@ -1731,7 +1730,7 @@ mtev_log_go_asynch() {
   void *data;
   mtev_log_stream_t ls;
 
-  while(mtev_hash_next(&mtev_loggers, &iter, &k, &klen, &data)) {
+  while(mtev_hash_next(mtev_loggers, &iter, &k, &klen, &data)) {
     ls = data;
     if(SUPPORTS_ASYNC(ls)) {
       asynch_log_ctx *actx = ls->op_ctx;
@@ -1751,7 +1750,7 @@ mtev_log_go_synch() {
   void *data;
   mtev_log_stream_t ls;
 
-  while(mtev_hash_next(&mtev_loggers, &iter, &k, &klen, &data)) {
+  while(mtev_hash_next(mtev_loggers, &iter, &k, &klen, &data)) {
     ls = data;
     if(SUPPORTS_ASYNC(ls)) {
       asynch_log_ctx *actx = ls->op_ctx;
@@ -1772,7 +1771,7 @@ mtev_log_reopen_all() {
   void *data;
   mtev_log_stream_t ls;
 
-  while(mtev_hash_next(&mtev_loggers, &iter, &k, &klen, &data)) {
+  while(mtev_hash_next(mtev_loggers, &iter, &k, &klen, &data)) {
     ls = data;
     if(ls->ops) if(ls->ops->reopenop(ls) < 0) rv = -1;
   }
@@ -1786,7 +1785,7 @@ mtev_log_list(mtev_log_stream_t *loggers, int nsize) {
   int klen, count = 0, total = 0, out_of_space_flag = 1;
   void *data;
 
-  while(mtev_hash_next(&mtev_loggers, &iter, &k, &klen, &data)) {
+  while(mtev_hash_next(mtev_loggers, &iter, &k, &klen, &data)) {
     if(count < nsize) loggers[count++] = (mtev_log_stream_t)data;
     else out_of_space_flag = -1;
     total++;
