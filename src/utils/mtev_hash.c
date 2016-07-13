@@ -291,7 +291,7 @@ void mtev_hash_init_locks(mtev_hash_table *h, int size, mtev_hash_lock_mode_t lo
 }
 
 int mtev_hash_size(mtev_hash_table *h) {
-  if(h->u.hs.hf == NULL) mtev_hash_init(h);
+  mtevAssert(h->u.hs.hf != NULL);
   return ck_hs_count(&h->u.hs);
 }
 int mtev_hash_replace(mtev_hash_table *h, const char *k, int klen, void *data,
@@ -302,7 +302,7 @@ int mtev_hash_replace(mtev_hash_table *h, const char *k, int klen, void *data,
   ck_hash_attr_t *data_struct;
   ck_hash_attr_t *attr = calloc(1, sizeof(ck_hash_attr_t) + klen + 1);
 
-  if(h->u.hs.hf == NULL) mtev_hash_init(h);
+  mtevAssert(h->u.hs.hf != NULL);
 
   memcpy(attr->key.label, k, klen);
   attr->key.label[klen] = 0;
@@ -331,9 +331,10 @@ int mtev_hash_replace(mtev_hash_table *h, const char *k, int klen, void *data,
 int mtev_hash_store(mtev_hash_table *h, const char *k, int klen, void *data) {
   long hashv;
   int ret = 0;
+
   ck_hash_attr_t *attr = calloc(1, sizeof(ck_hash_attr_t) + klen + 1);
 
-  if(h->u.hs.hf == NULL) mtev_hash_init(h);
+  mtevAssert(h->u.hs.hf != NULL);
 
   memcpy(attr->key.label, k, klen);
   attr->key.label[klen] = 0;
@@ -359,7 +360,7 @@ int mtev_hash_retrieve(mtev_hash_table *h, const char *k, int klen, void **data)
   ck_hash_attr_t *data_struct;
 
   if(!h) return 0;
-  if(h->u.hs.hf == NULL) mtev_hash_init(h);
+  mtevAssert(h->u.hs.hf != NULL);
 
   if(klen > ONSTACK_KEY_SIZE) key = calloc(1, sizeof(ck_key_t) + klen + 1);
   memcpy(key->label, k, klen);
@@ -405,7 +406,7 @@ int mtev_hash_delete(mtev_hash_table *h, const char *k, int klen,
   ck_key_t *key = &onstack_key.key;
 
   if(!h) return 0;
-  if(h->u.hs.hf == NULL) mtev_hash_init(h);
+  mtevAssert(h->u.hs.hf != NULL);
 
   if(klen > ONSTACK_KEY_SIZE) key = calloc(1, sizeof(ck_key_t) + klen + 1);
   memcpy(key->label, k, klen);
@@ -434,8 +435,9 @@ void mtev_hash_delete_all(mtev_hash_table *h, NoitHashFreeFunc keyfree, NoitHash
   ck_hs_iterator_t iterator = CK_HS_ITERATOR_INITIALIZER;
   ck_hash_attr_t *data_struct;
 
+
   if(!h) return;
-  if(h->u.hs.hf == NULL) mtev_hash_init(h);
+  mtevAssert(h->u.hs.hf != NULL);
 
   int count = mtev_hash_size(h);
   LOCK(h);
@@ -453,7 +455,7 @@ void mtev_hash_delete_all(mtev_hash_table *h, NoitHashFreeFunc keyfree, NoitHash
 
 void mtev_hash_destroy(mtev_hash_table *h, NoitHashFreeFunc keyfree, NoitHashFreeFunc datafree) {
   if(!h) return;
-  if(h->u.hs.hf == NULL) mtev_hash_init(h);
+  mtevAssert(h->u.hs.hf != NULL);
   mtev_hash_delete_all(h, keyfree, datafree);
   LOCK(h);
   ck_hs_destroy(&h->u.hs);
@@ -479,7 +481,7 @@ int mtev_hash_next(mtev_hash_table *h, mtev_hash_iter *iter,
   ck_key_t *key;
   ck_hash_attr_t *data_struct;
 
-  if(h->u.hs.hf == NULL) mtev_hash_init(h);
+  mtevAssert(h->u.hs.hf != NULL);
 
   if(!ck_hs_next(&h->u.hs, iter, &cursor)) return 0;
   key = (ck_key_t *)cursor;
