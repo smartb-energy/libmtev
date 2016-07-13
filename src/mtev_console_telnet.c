@@ -1854,7 +1854,6 @@ void
 mtev_console_telnet_free(mtev_console_telnet_closure_t telnet) {
   free(telnet->_subbuffer);
   mtev_hash_destroy(telnet->_env, free, free);
-  mtev_hash_free(telnet->_env);
   free(telnet);
 }
 

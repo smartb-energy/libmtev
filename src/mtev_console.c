@@ -211,8 +211,7 @@ mtev_console_closure_free(void *vncct) {
   if(ncct->pty_slave >= 0) close(ncct->pty_slave);
   if(ncct->outbuf) free(ncct->outbuf);
   if(ncct->telnet) mtev_console_telnet_free(ncct->telnet);
-  mtev_hash_destroy(&ncct->userdata, NULL, mtev_console_userdata_free);
-  mtev_hash_free(&ncct->userdata);
+  mtev_hash_destroy(ncct->userdata, NULL, mtev_console_userdata_free);
   while(ncct->state_stack) {
     mtev_console_state_stack_t *tmp;
     tmp = ncct->state_stack;
@@ -248,7 +247,7 @@ mtev_console_userdata_set(struct __mtev_console_closure *ncct,
   item->name = strdup(name);
   item->data = data;
   item->freefunc = freefunc;
-  mtev_hash_replace(&ncct->userdata, item->name, strlen(item->name),
+  mtev_hash_replace(ncct->userdata, item->name, strlen(item->name),
                     item, NULL, mtev_console_userdata_free);
 }
   
@@ -256,7 +255,7 @@ void *
 mtev_console_userdata_get(struct __mtev_console_closure *ncct,
                           const char *name) {
   void *vitem;
-  if(mtev_hash_retrieve(&ncct->userdata, name, strlen(name),
+  if(mtev_hash_retrieve(ncct->userdata, name, strlen(name),
                         &vitem))
     return ((mtev_console_userdata_t *)vitem)->data;
   return NULL;

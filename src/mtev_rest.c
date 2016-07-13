@@ -824,7 +824,6 @@ compile_listener_res(mtev_conf_section_t node, mtev_hash_table **htptr) {
   cnt = mtev_conf_property_iter(node, accrue_and_compile, ht);
   if(cnt == 0) {
     mtev_hash_destroy(ht, free, pcre_free);
-    mtev_hash_free(ht);
     return;
   }
   *htptr = ht;

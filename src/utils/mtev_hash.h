@@ -73,12 +73,6 @@ mtev_hash_table *mtev_hash_new_size(int size);
  */
 mtev_hash_table *mtev_hash_new_locks(int size, mtev_hash_lock_mode_t lock_mode);
 
-/**
- * you must first call mtev_hash_destroy with your key and value free funcs.  If you
- * fail to do this, calling this will leak memory
- */
-void mtev_hash_free(mtev_hash_table *t);
-
 /* NOTE! "k" and "data" MUST NOT be transient buffers, as the hash table
  * implementation does not duplicate them.  You provide a pair of
  * NoitHashFreeFunc functions to free up their storage when you call

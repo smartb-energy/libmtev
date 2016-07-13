@@ -1534,9 +1534,7 @@ mtev_connections_from_config(mtev_hash_table *tracker, pthread_mutex_t *tracker_
                              handler_free);
     found++;
     mtev_hash_destroy(sslconfig,free,free);
-    mtev_hash_free(sslconfig);
     mtev_hash_destroy(config,free,free);
-    mtev_hash_free(config);
   }
   free(mtev_configs);
   return found;
@@ -1759,7 +1757,6 @@ mtev_console_reverse_opts(mtev_console_closure_t ncct,
         if(idx == i) {
           pthread_rwlock_unlock(&reverse_sockets_lock);
           mtev_hash_destroy(dedup, NULL, NULL);
-          mtev_hash_free(dedup);
           return strdup(ctx->id);
         }
         i++;
@@ -1767,7 +1764,6 @@ mtev_console_reverse_opts(mtev_console_closure_t ncct,
     }
     pthread_rwlock_unlock(&reverse_sockets_lock);
     mtev_hash_destroy(dedup, NULL, NULL);
-    mtev_hash_free(dedup);
   }
   if(argc == 2)
     return mtev_console_opt_delegate(ncct, stack, dstate, argc-1, argv+1, idx);

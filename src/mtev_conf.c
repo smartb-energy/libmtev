@@ -1393,7 +1393,6 @@ mtev_conf_get_namespaced_hash(mtev_conf_section_t section,
   mtev_conf_get_into_hash(section, path, table, ns);
   if(mtev_hash_size(table) == 0) {
     mtev_hash_destroy(table, free, free);
-    mtev_hash_free(table);
     table = NULL;
   }
   return table;

@@ -483,6 +483,7 @@ void mtev_hash_destroy(mtev_hash_table *h, NoitHashFreeFunc keyfree, NoitHashFre
   UNLOCK(h);
   mtev_hash_destroy_locks(h);
   free(h->u.locks.locks);
+  free(h);
 }
 
 void mtev_hash_merge_as_dict(mtev_hash_table *dst, mtev_hash_table *src) {

@@ -194,7 +194,7 @@ static const char gzip_header[10] =
   { '\037', '\213', Z_DEFLATED, 0, 0, 0, 0, 0, 0, 0x03 };
 
 #define CTX_ADD_HEADER(a,b) \
-    mtev_hash_replace(&ctx->res.headers, \
+    mtev_hash_replace(ctx->res.headers, \
                       strdup(a), strlen(a), strdup(b), free, free)
 static const char _hexchars[16] =
   {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
@@ -363,15 +363,15 @@ mtev_boolean mtev_http_request_has_payload(mtev_http_request *req) {
 const char *mtev_http_request_querystring(mtev_http_request *req, const char *k) {
   void *vv;
   const char *v = NULL;
-  if(mtev_hash_retrieve(&req->querystring, k, strlen(k), &vv))
+  if(mtev_hash_retrieve(req->querystring, k, strlen(k), &vv))
     v = vv;
   return v;
 }
 mtev_hash_table *mtev_http_request_querystring_table(mtev_http_request *req) {
-  return &req->querystring;
+  return req->querystring;
 }
 mtev_hash_table *mtev_http_request_headers_table(mtev_http_request *req) {
-  return &req->headers;
+  return req->headers;
 }
 void
 mtev_http_request_set_upload(mtev_http_request *req,
@@ -530,13 +530,13 @@ begin_span(mtev_http_session_ctx *ctx) {
   int64_t *trace_id, *parent_span_id, *span_id;
   bool sampled = false;
 
-  (void)mtev_hash_retr_str(&req->headers, HEADER_ZIPKIN_TRACEID_L,
+  (void)mtev_hash_retr_str(req->headers, HEADER_ZIPKIN_TRACEID_L,
                            strlen(HEADER_ZIPKIN_TRACEID_L), &trace_hdr);
-  (void)mtev_hash_retr_str(&req->headers, HEADER_ZIPKIN_PARENTSPANID_L,
+  (void)mtev_hash_retr_str(req->headers, HEADER_ZIPKIN_PARENTSPANID_L,
                            strlen(HEADER_ZIPKIN_PARENTSPANID_L), &parent_span_hdr);
-  (void)mtev_hash_retr_str(&req->headers, HEADER_ZIPKIN_SPANID_L,
+  (void)mtev_hash_retr_str(req->headers, HEADER_ZIPKIN_SPANID_L,
                            strlen(HEADER_ZIPKIN_SPANID_L), &span_hdr);
-  (void)mtev_hash_retr_str(&req->headers, HEADER_ZIPKIN_SAMPLED_L,
+  (void)mtev_hash_retr_str(req->headers, HEADER_ZIPKIN_SAMPLED_L,
                            strlen(HEADER_ZIPKIN_SAMPLED_L), &sampled_hdr);
   trace_id = mtev_zipkin_str_to_id(trace_hdr, &trace_id_buf);
   parent_span_id = mtev_zipkin_str_to_id(parent_span_hdr, &parent_span_id_buf);
@@ -551,7 +551,7 @@ begin_span(mtev_http_session_ctx *ctx) {
   mtev_zipkin_span_bannotate(ctx->zipkin_span, ZIPKIN_STRING,
                              zipkin_http_method, false,
                              req->method_str, strlen(req->method_str), false);
-  if(mtev_hash_retr_str(&req->headers, "host", 4, &host_hdr)) {
+  if(mtev_hash_retr_str(req->headers, "host", 4, &host_hdr)) {
     /* someone could screw with the host header, so we indicate a copy */
     mtev_zipkin_span_bannotate(ctx->zipkin_span, ZIPKIN_STRING,
                                zipkin_http_hostname, false,
@@ -798,13 +798,13 @@ mtev_http_request_finalize_headers(mtev_http_request *req, mtev_boolean *err) {
           if(strstr(value, "deflate")) req->opts |= MTEV_HTTP_DEFLATE;
         }
         if(name)
-          mtev_hash_replace(&req->headers, name, strlen(name), (void *)value,
+          mtev_hash_replace(req->headers, name, strlen(name), (void *)value,
                             NULL, NULL);
         else {
           struct bchain *b;
           const char *prefix = NULL;
           int l1, l2;
-          mtev_hash_retr_str(&req->headers, last_name, strlen(last_name),
+          mtev_hash_retr_str(req->headers, last_name, strlen(last_name),
                              &prefix);
           if(!prefix) FAIL;
           l1 = strlen(prefix);
@@ -818,7 +818,7 @@ mtev_http_request_finalize_headers(mtev_http_request *req, mtev_boolean *err) {
           b->buff[l1] = ' ';
           memcpy(b->buff + l1 + 1, value, l2);
           b->buff[l1 + 1 + l2] = '\0';
-          mtev_hash_replace(&req->headers, last_name, strlen(last_name),
+          mtev_hash_replace(req->headers, last_name, strlen(last_name),
                             b->buff, NULL, NULL);
         }
         if(name) last_name = name;
@@ -828,14 +828,14 @@ mtev_http_request_finalize_headers(mtev_http_request *req, mtev_boolean *err) {
   }
 
   /* headers are done... we could need to read a payload */
-  if(mtev_hash_retrieve(&req->headers,
+  if(mtev_hash_retrieve(req->headers,
                         HEADER_TRANSFER_ENCODING,
                         sizeof(HEADER_TRANSFER_ENCODING)-1, &vval)) {
     req->has_payload = mtev_true;
     req->payload_chunked = mtev_true;
     req->content_length = 0;
   }
-  else if(mtev_hash_retrieve(&req->headers,
+  else if(mtev_hash_retrieve(req->headers,
                         HEADER_CONTENT_LENGTH,
                         sizeof(HEADER_CONTENT_LENGTH)-1, &vval)) {
     const char *val = vval;
@@ -843,7 +843,7 @@ mtev_http_request_finalize_headers(mtev_http_request *req, mtev_boolean *err) {
     req->content_length = strtoll(val, NULL, 10);
   }
 
-  if(mtev_hash_retrieve(&req->headers, HEADER_EXPECT,
+  if(mtev_hash_retrieve(req->headers, HEADER_EXPECT,
                         sizeof(HEADER_EXPECT)-1, &vval)) {
     const char *val = vval;
     if(strncmp(val, "100-", 4) || /* Bad expect header */
@@ -876,13 +876,13 @@ mtev_http_process_querystring(mtev_http_request *req) {
     eq = strchr(interest, '=');
     if(!eq) {
       inplace_urldecode(interest);
-      mtev_hash_store(&req->querystring, interest, strlen(interest), NULL);
+      mtev_hash_store(req->querystring, interest, strlen(interest), NULL);
     }
     else {
       *eq++ = '\0';
       inplace_urldecode(interest);
       inplace_urldecode(eq);
-      mtev_hash_store(&req->querystring, interest, strlen(interest), eq);
+      mtev_hash_store(req->querystring, interest, strlen(interest), eq);
     }
   }
 }
@@ -982,8 +982,8 @@ mtev_http_session_prime_input(mtev_http_session_ctx *ctx,
 
 void
 mtev_http_request_release(mtev_http_session_ctx *ctx) {
-  mtev_hash_destroy(&ctx->req.querystring, NULL, NULL);
-  mtev_hash_destroy(&ctx->req.headers, NULL, NULL);
+  mtev_hash_destroy(ctx->req.querystring, NULL, NULL);
+  mtev_hash_destroy(ctx->req.headers, NULL, NULL);
   /* If we expected a payload, we expect a trailing \r\n */
   if(ctx->req.has_payload) {
     int drained, mask;
@@ -1004,7 +1004,7 @@ mtev_http_request_release(mtev_http_session_ctx *ctx) {
 }
 void
 mtev_http_response_release(mtev_http_session_ctx *ctx) {
-  mtev_hash_destroy(&ctx->res.headers, free, free);
+  mtev_hash_destroy(ctx->res.headers, free, free);
   if(ctx->res.status_reason) free(ctx->res.status_reason);
   RELEASE_BCHAIN(ctx->res.leader);
   RELEASE_BCHAIN(ctx->res.output);
@@ -1563,6 +1563,9 @@ mtev_http_session_ctx_websocket_new(mtev_http_dispatch_func f, mtev_http_websock
 {
   mtev_http_session_ctx *ctx;
   ctx = calloc(1, sizeof(*ctx));
+  ctx->req.querystring = mtev_hash_new();
+  ctx->req.headers = mtev_hash_new();
+  ctx->res.headers = mtev_hash_new(); 
   ctx->ref_cnt = 1;
   pthread_mutex_init(&ctx->write_lock, NULL);
   ctx->req.complete = mtev_false;
@@ -1595,7 +1598,7 @@ mtev_boolean
 mtev_http_response_header_set(mtev_http_session_ctx *ctx,
                               const char *name, const char *value) {
   if(ctx->res.output_started == mtev_true) return mtev_false;
-  mtev_hash_replace(&ctx->res.headers, strdup(name), strlen(name),
+  mtev_hash_replace(ctx->res.headers, strdup(name), strlen(name),
                     strdup(value), free, free);
   return mtev_true;
 }
@@ -1737,8 +1740,8 @@ _http_construct_leader(mtev_http_session_ctx *ctx) {
   while(!cl_present) {
     mtev_hash_iter iter = MTEV_HASH_ITER_ZERO;
     i = 0;
-    keys = alloca(sizeof(*keys)*(mtev_hash_size(&ctx->res.headers)));
-    while(mtev_hash_next_str(&ctx->res.headers, &iter,
+    keys = alloca(sizeof(*keys)*(mtev_hash_size(ctx->res.headers)));
+    while(mtev_hash_next_str(ctx->res.headers, &iter,
                              &key, &klen, &value)) {
       keys[i++] = key;
       if(klen == strlen(HEADER_CONTENT_LENGTH) &&
@@ -1766,7 +1769,7 @@ _http_construct_leader(mtev_http_session_ctx *ctx) {
     int vlen;
     key = keys[i];
     klen = strlen(key);
-    (void)mtev_hash_retr_str(&ctx->res.headers, key, klen, &value);
+    (void)mtev_hash_retr_str(ctx->res.headers, key, klen, &value);
     vlen = strlen(value);
     CTX_LEADER_APPEND(key, klen);
     CTX_LEADER_APPEND(": ", 2);
