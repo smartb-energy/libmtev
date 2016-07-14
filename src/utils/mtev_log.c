@@ -1177,8 +1177,7 @@ static logops_t jlog_logio_ops = {
 
 void
 mtev_log_init(int debug_on) {
-  mtev_loggers = mtev_hash_new();
-  mtev_logops = mtev_hash_new();
+  mtev_log_init_globals();
   mtev_register_logops("file", &posix_logio_ops);
   mtev_register_logops("jlog", &jlog_logio_ops);
   mtev_register_logops("memory", &membuf_logio_ops);
@@ -1791,5 +1790,11 @@ mtev_log_list(mtev_log_stream_t *loggers, int nsize) {
     total++;
   }
   return total * out_of_space_flag;
+}
+
+void
+mtev_log_init_globals() {
+  mtev_loggers = mtev_hash_new();
+  mtev_logops = mtev_hash_new();
 }
 

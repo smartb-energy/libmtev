@@ -2741,3 +2741,8 @@ void mtev_console_conf_init() {
           mtev_console_state_delegate, mtev_console_opt_delegate,
           _write_state, NULL);
 }
+
+void mtev_conf_init_globals() {
+  _compiled_fallback = mtev_hash_new();
+}
+

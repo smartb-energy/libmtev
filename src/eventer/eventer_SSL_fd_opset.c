@@ -1136,3 +1136,7 @@ void eventer_ssl_init() {
   return;
 }
 
+void eventer_ssl_init_globals() {
+  ssl_ctx_cache = mtev_hash_new();
+}
+

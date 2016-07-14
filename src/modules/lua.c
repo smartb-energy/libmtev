@@ -825,3 +825,9 @@ mtev_lua_open(const char *module_name, void *lmc,
 
   return L;
 }
+
+void
+mtev_lua_init_globals() {
+  mtev_lua_states = mtev_hash_new();
+  mtev_coros = mtev_hash_new();
+}

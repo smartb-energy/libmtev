@@ -2065,3 +2065,8 @@ mtev_lua_help_initiate_mtev_connection(const char *address, int port,
                            mtev_reverse_socket_deref);
   return 0;
 }
+void
+mtev_reverse_socket_init_globals() {
+  reverse_sockets = mtev_hash_new();
+  reverses = mtev_hash_new();
+}

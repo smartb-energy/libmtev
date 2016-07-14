@@ -192,3 +192,10 @@ int eventer_choose(const char *name) {
   }
   return -1;
 }
+
+void eventer_init_globals() {
+  __name_to_func = mtev_hash_new();
+  __func_to_name = mtev_hash_new();
+  eventer_ssl_init_globals();
+}
+

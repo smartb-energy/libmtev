@@ -980,4 +980,8 @@ mtev_hash_store(mime_type_defaults, strdup(ext), strlen(ext), strdup(type))
                                  MTEV_CONTROL_PUT,
                                  mtev_http_rest_handler);
 }
+void mtev_http_rest_init_globals() {
+  dispatch_points = mtev_hash_new();
+  mime_type_defaults = mtev_hash_new();
+}
 

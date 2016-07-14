@@ -392,6 +392,11 @@ void mtev_dso_add_type(const char *name, int (*list)(const char ***)) {
   dso_types = node;
 }
 
+void mtev_dso_init_globals() {
+  loaders = mtev_hash_new();
+  generics = mtev_hash_new();
+}
+
 #define userdata_accessors(type, field) \
 void *mtev_##type##_get_userdata(mtev_##type##_t *mod) { \
   return mod->field->userdata; \

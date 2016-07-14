@@ -519,13 +519,17 @@ int mtev_lua_dns_index_func(lua_State *L) {
   return 0;
 }
 
+void mtev_lua_init_dns_globals() {
+  dns_rtypes = mtev_hash_new();
+  dns_ctypes = mtev_hash_new();
+}
+
 void mtev_lua_init_dns() {
   int i;
   const struct dns_nameval *nv;
   struct dns_ctx *pctx;
 
-  dns_rtypes = mtev_hash_new();
-  dns_ctypes = mtev_hash_new();
+  mtev_lua_init_dns_globals();
 
   /* HASH the rr types */
   for(i=0, nv = &dns_typetab[i]; nv->name; nv = &dns_typetab[++i])
@@ -547,3 +551,4 @@ void mtev_lua_init_dns() {
   else
     dns_free(pctx);
 }
+

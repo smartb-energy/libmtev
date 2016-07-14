@@ -635,3 +635,8 @@ mtev_listener_init(const char *toplevel) {
   mtev_listener_reconfig(toplevel);
 }
 
+void
+mtev_listener_init_globals() {
+  listener_commands = mtev_hash_new();
+}
+

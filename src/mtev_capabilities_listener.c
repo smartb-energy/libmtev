@@ -449,4 +449,7 @@ cleanup_shutdown:
   goto cleanup_shutdown;
 }
 
-
+void
+mtev_capabilities_init_globals() {
+  features = mtev_hash_new();
+}
