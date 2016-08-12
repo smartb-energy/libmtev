@@ -42,6 +42,8 @@
 #include <pthread.h>
 #include <setjmp.h>
 
+typedef struct ck_fifo_mpmc ck_fifo_mpmc_t;
+
 /*
  * This is for jobs that would block and need more forceful timeouts.
  */
@@ -58,8 +60,7 @@ typedef struct _eventer_job_t {
   int                     timeout_triggered; /* set, if it expires in-flight */
   mtev_atomic32_t         inflight;
   mtev_atomic32_t         has_cleanedup;
-  void                  (*cleanup)(struct _eventer_job_t *);
-  struct _eventer_job_t  *next;
+  void                    (*cleanup)(struct _eventer_job_t *);
   struct _eventer_jobq_t *jobq;
 } eventer_job_t;
 
@@ -71,13 +72,10 @@ typedef enum {
 
 typedef struct _eventer_jobq_t {
   const char             *queue_name;
-  pthread_mutex_t         lock;
-  sem_t                   semaphore;
   mtev_atomic32_t         concurrency;
   mtev_atomic32_t         desired_concurrency;
   mtev_atomic32_t         pending_cancels;
-  eventer_job_t          *headq;
-  eventer_job_t          *tailq;
+  ck_fifo_mpmc_t          *fifo;
   pthread_key_t           threadenv;
   pthread_key_t           activejob;
   mtev_atomic32_t         backlog;

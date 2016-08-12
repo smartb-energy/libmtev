@@ -41,6 +41,8 @@
 #include <setjmp.h>
 #include <signal.h>
 
+#include <ck_fifo.h>
+
 #ifndef JOBQ_SIGNAL
 #define JOBQ_SIGNAL SIGALRM
 #endif
@@ -90,7 +92,6 @@ eventer_jobq_handler(int signo)
 int
 eventer_jobq_init_ms(eventer_jobq_t *jobq, const char *queue_name,
                      eventer_jobq_memory_safety_t ms) {
-  pthread_mutexattr_t mutexattr;
 
   if(mtev_atomic_cas32(&threads_jobq_inited, 1, 0) == 0) {
     struct sigaction act;
@@ -122,19 +123,6 @@ eventer_jobq_init_ms(eventer_jobq_t *jobq, const char *queue_name,
   memset(jobq, 0, sizeof(*jobq));
   jobq->mem_safety = ms;
   jobq->queue_name = strdup(queue_name);
-  if(pthread_mutexattr_init(&mutexattr) != 0) {
-    mtevL(mtev_error, "Cannot initialize lock attributes\n");
-    return -1;
-  }
-  if(pthread_mutex_init(&jobq->lock, &mutexattr) != 0) {
-    mtevL(mtev_error, "Cannot initialize lock\n");
-    return -1;
-  }
-  if(sem_init(&jobq->semaphore, 0, 0) != 0) {
-    mtevL(mtev_error, "Cannot initialize semaphore: %s\n",
-          strerror(errno));
-    return -1;
-  }
   if(pthread_key_create(&jobq->activejob, NULL)) {
     mtevL(mtev_error, "Cannot initialize thread-specific activejob: %s\n",
           strerror(errno));
@@ -145,6 +133,10 @@ eventer_jobq_init_ms(eventer_jobq_t *jobq, const char *queue_name,
           strerror(errno));
     return -1;
   }
+
+  jobq->fifo = malloc(sizeof(ck_fifo_mpmc_t));
+  ck_fifo_mpmc_init(jobq->fifo, malloc(sizeof(ck_fifo_mpmc_entry_t)));
+    
   pthread_mutex_lock(&all_queues_lock);
   if(mtev_hash_store(&all_queues, jobq->queue_name, strlen(jobq->queue_name),
                      jobq) == 0) {
@@ -208,49 +200,32 @@ eventer_jobq_maybe_spawn(eventer_jobq_t *jobq) {
 }
 void
 eventer_jobq_enqueue(eventer_jobq_t *jobq, eventer_job_t *job) {
-  job->next = NULL;
   eventer_jobq_maybe_spawn(jobq);
-  pthread_mutex_lock(&jobq->lock);
-  if(jobq->tailq) {
-    /* If there is a tail (queue has items), just push it on the end. */
-    jobq->tailq->next = job;
-    jobq->tailq = job;
-  }
-  else {
-    /* Otherwise, this is the first and only item on the list. */
-    jobq->headq = jobq->tailq = job;
-  }
-  pthread_mutex_unlock(&jobq->lock);
+
+  ck_fifo_mpmc_entry_t *entry = malloc(sizeof(ck_fifo_mpmc_entry_t));
+
+  ck_fifo_mpmc_enqueue(jobq->fifo, entry, job);
+
   mtev_atomic_inc64(&jobq->total_jobs);
   mtev_atomic_inc32(&jobq->backlog);
-
-  /* Signal consumers */
-  sem_post(&jobq->semaphore);
 }
 
 static eventer_job_t *
 __eventer_jobq_dequeue(eventer_jobq_t *jobq, int should_wait) {
   eventer_job_t *job = NULL;
+  ck_fifo_mpmc_entry_t *garbage;
 
   /* Wait for a job */
-  if(should_wait) while(sem_wait(&jobq->semaphore) && errno == EINTR);
-  /* Or Try-wait for a job */
-  else if(sem_trywait(&jobq->semaphore)) return NULL;
-
-  pthread_mutex_lock(&jobq->lock);
-  if(jobq->headq) {
-    /* If there are items, pop and advance the header pointer */
-    job = jobq->headq;
-    jobq->headq = jobq->headq->next;
-    if(!jobq->headq) jobq->tailq = NULL;
+  while (CK_FIFO_MPMC_ISEMPTY(jobq->fifo) && should_wait == 1) {
+    usleep(1);
   }
-  pthread_mutex_unlock(&jobq->lock);
 
-  if(job) {
-    job->next = NULL; /* To reduce any confusion */
+  if (ck_fifo_mpmc_dequeue(jobq->fifo, &job, &garbage)) {
+    free(garbage);
     mtev_atomic_dec32(&jobq->backlog);
     mtev_atomic_inc32(&jobq->inflight);
   }
+
   /* Our semaphores are counting semaphores, not locks. */
   /* coverity[missing_unlock] */
   return job;
@@ -268,9 +243,11 @@ eventer_jobq_dequeue_nowait(eventer_jobq_t *jobq) {
 
 void
 eventer_jobq_destroy(eventer_jobq_t *jobq) {
-  pthread_mutex_destroy(&jobq->lock);
-  sem_destroy(&jobq->semaphore);
+  ck_fifo_mpmc_entry_t *garbage;
+  ck_fifo_mpmc_deinit(jobq->fifo, &garbage);
+  free(jobq->fifo);
 }
+
 int
 eventer_jobq_execute_timeout(eventer_t e, int mask, void *closure,
                              struct timeval *now) {
