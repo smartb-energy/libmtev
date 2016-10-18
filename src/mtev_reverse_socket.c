@@ -792,8 +792,6 @@ socket_error:
     ac->service_ctx_free(ac->service_ctx);
     ac->service_ctx_free = NULL;
     acceptor_closure_free(ac);
-    /* now clean up the reverse socket directly ourselves */
-    mtev_reverse_socket_shutdown(rc, e);
     eventer_remove_fd(e->fd);
     mtevL(nldeb, "reverse_socket: %s\n", socket_error_string);
     e->opset->close(e->fd, &mask, e);
