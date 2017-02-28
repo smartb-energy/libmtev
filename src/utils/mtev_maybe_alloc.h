@@ -33,6 +33,14 @@
 
 #include <stdlib.h>
 
+#define MTEV_MAYBE_DECL_TYPE(type, type_name, cnt) \
+  struct type_name {                               \
+    size_t sz;                                     \
+    type   static_buff[cnt];                       \
+    type   *data;                                  \
+    type   *pos;                                   \
+  }
+
 /*! \fn MTEV_MAYBE_DECL_VARS(type, name, cnt)
     \brief C Macro for declaring a "maybe" buffer.
     \param type A C type (e.g. char)
@@ -40,19 +48,16 @@
     \param cnt The number of type elements initially declared.
  */
 #define MTEV_MAYBE_DECL_VARS(type, name, cnt) \
-  struct { \
-    size_t sz; \
-    type   static_buff[cnt]; \
-  } __##name##_support; \
-  type *name
+  MTEV_MAYBE_DECL_TYPE(type, ##name##_t, cnt) name;
 
 /*! \fn MTEV_MAYBE_INIT_VARS(name)
     \brief C Macro for initializing a "maybe" buffer
     \param name The name of "maybe" buffer.
  */
-#define MTEV_MAYBE_INIT_VARS(name) \
-  __##name##_support.sz = sizeof(__##name##_support.static_buff); \
-  name = __##name##_support.static_buff
+#define MTEV_MAYBE_INIT_VARS(name)              \
+  (name).sz = sizeof((name).static_buff);       \
+  (name).data = (name).static_buff;             \
+  (name).pos = (name).data
 
 /*! \fn MTEV_MAYBE_DECL(type, name, cnt)
     \brief C Macro for declaring a "maybe" buffer.
@@ -69,11 +74,23 @@
   MTEV_MAYBE_DECL_VARS(type, name, cnt); \
   MTEV_MAYBE_INIT_VARS(name)
 
-/*! \fn MTEV_MAYBE_SIZE(name)
+/*! \fn MTEV_MAYBE_IZE(name)
     \brief C Macro for number of bytes available in this buffer.
     \param name The name of the "maybe" buffer.
  */
-#define MTEV_MAYBE_SIZE(name) (__##name##_support.sz + 0)
+#define MTEV_MAYBE_SIZE(name) ((name).sz + 0)
+
+/*! \fn MTEV_MAYBE_USED(name)
+    \brief C Macro for number of bytes used in this buffer.
+    \param name The name of the "maybe" buffer.
+ */
+#define MTEV_MAYBE_USED(name) ((name).pos - (name).data)
+
+/*! \fn MTEV_MAYBE_AVAIL(name)
+    \brief C Macro for number of bytes available at the end of this buffer
+    \param name The name of the "maybe" buffer.
+ */
+#define MTEV_MAYBE_AVAIL(name) ((name).sz - (name).pos - (name).data)
 
 /*! \fn MTEV_MAYBE_REALLOC(name, cnt)
     \brief C Macro to ensure a maybe buffer has at least cnt elements allocated.
@@ -84,25 +101,31 @@
     than or equal to the current allocation size is specified.  It is safe
     to simply run this macro prior to each write to the buffer.
  */
-#define MTEV_MAYBE_REALLOC(name, cnt) \
-do { \
-  if(__##name##_support.sz < (cnt) * sizeof(*(name))) { \
-    size_t prevsz = __##name##_support.sz; \
-    __##name##_support.sz = (cnt) * sizeof(*(name)); \
-    if(name != __##name##_support.static_buff) { \
-      name = realloc(name, __##name##_support.sz); \
-    } else { \
-      name = malloc(__##name##_support.sz); \
-      memcpy(name, __##name##_support.static_buff, prevsz); \
-    } \
-  } \
-} while(0)
+#define MTEV_MAYBE_REALLOC(name, cnt)           \
+  do {                                              \
+    if((name).sz < (cnt) * sizeof(*((name).data))) {  \
+      size_t prevsz = (name).sz;                      \
+      (name).sz = (cnt) * sizeof(*((name).data));     \
+      ptrdiff_t diff = (name).pos - (name).data;      \
+      if((name).data != (name).static_buff) {         \
+        (name).data = realloc((name).data, (name).sz);  \
+        (name).pos = (name).data + diff;                \
+      } else {                                          \
+        (name).data = malloc((name).sz);                  \
+        memcpy((name).data, (name).static_buff, prevsz);  \
+        (name).pos = (name).data + diff;                  \
+      }                                                   \
+    }                                                     \
+  } while(0)
+
+#define MTEV_MAYBE_DATA(name) (name).data
+#define MTEV_MAYBE_POS(name) (name).pos
 
 /*! \fn MTEV_MAYBE_FREE(name)
     \brief C Macro to free any heap space associated with a "maybe" buffer.
     \param name The name of the "maybe" buffer.
  */
 #define MTEV_MAYBE_FREE(name) \
-do { if(name != __##name##_support.static_buff) free(name); } while(0)
+  do { if((name).data != (name).static_buff) free((name).data); } while(0)
 
 #endif
