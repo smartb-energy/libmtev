@@ -64,5 +64,7 @@ do_build()
 }
 
 do_install() {
-  return 0
+  cp /src/src/scripts/mtev-config $pkg_prefix/bin/mtev-config
+  chmod +x $pkg_prefix/bin/mtev-config
+  return $?
 }
