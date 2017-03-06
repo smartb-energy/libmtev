@@ -58,13 +58,14 @@ do_build()
   export LDFLAGS="-Wl,-rpath=$(pkg_path_for core/ncurses)/lib -Wl,-rpath=$(pkg_path_for core/glibc)/lib -Wl,-rpath=$(pkg_path_for smartb/fq)/lib -Wl,-rpath=$(pkg_path_for core/util-linux)/lib $LDFLAGS"
   cd /src
   autoreconf -i
-  ./configure --without-ssl --disable-amqp
+  ./configure --without-ssl --disable-amqp --prefix=$pkg_prefix
   make
+  make install
   return $?
 }
 
 do_install() {
-  cp /src/src/scripts/mtev-config $pkg_prefix/bin/mtev-config
+  sed -i "s@#!/usr/bin/perl@#!$(hab pkg path core/perl)/bin/perl@" $pkg_prefix/bin/mtev-config
   chmod +x $pkg_prefix/bin/mtev-config
   return $?
 }
