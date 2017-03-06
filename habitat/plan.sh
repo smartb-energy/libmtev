@@ -8,23 +8,23 @@ pkg_lib_dirs=(lib)
 pkg_include_dirs=(include)
 pkg_bin_dirs=(bin)
 pkg_build_deps=(
+  bixu/fq
   core/autoconf
   core/gcc
   core/git
   core/glibc
-  core/openssl
   core/libxml2
   core/libxslt
   core/lz4
   core/make
   core/ncurses
+  core/openssl
   core/perl
   core/pkg-config
   core/util-linux
   core/zlib
   paytmlabs/hostname
   smartb/ck
-  bixu/fq
   smartb/hwloc
   smartb/jlog
   smartb/libcircllhist/master
@@ -44,12 +44,12 @@ do_download()
 
 do_clean()
 {
-    return 0
+  return 0
 }
 
 do_unpack()
 {
-    return 0
+  return 0
 }
 
 do_build()
